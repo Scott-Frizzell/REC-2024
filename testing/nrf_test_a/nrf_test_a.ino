@@ -1,9 +1,7 @@
 #include <SPI.h>
 #include <nRF24L01.h>
 #include <RF24.h>
-
-#define NRF_CE 7
-#define NRF_CSN 8
+#include <cppQueue.h>
 
 RF24 radio(7, 8);
 
