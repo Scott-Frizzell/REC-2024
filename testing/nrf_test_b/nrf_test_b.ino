@@ -1,15 +1,13 @@
-#include <RF24.h>
-#include <nRF24L01.h>
 #include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
 #include <ArduinoQueue.h>
-
-struct NRFMessage {
-  char msg[32];
-};
+#include "NRFMessage.h"
 
 RF24 radio(7, 8);
-ArduinoQueue<NRFMessage> outgoingQueue = ArduinoQueue<NRFMessage>(20);
-ArduinoQueue<NRFMessage> incomingQueue = ArduinoQueue<NRFMessage>(20);
+
+ArduinoQueue<NRFMessage> outgoingQueue = ArduinoQueue<NRFMessage>(10);
+ArduinoQueue<NRFMessage> incomingQueue = ArduinoQueue<NRFMessage>(10);
 
 const byte writeaddr[6] = "00002";
 const byte readaddr[6] = "00001";
@@ -27,23 +25,23 @@ void loop() {
   if (radio.available()) {
     char input[32] = "";
     radio.read(&input, sizeof(input));
-    struct NRFMessage temp = {input};
-    incomingQueue.enqueue(&temp);
+    incomingQueue.enqueue(NRFMessage(&input[0], 32));
     radio.flush_tx();
   }
   if (!incomingQueue.isEmpty()) {
-    char input[32] = {incomingQueue.dequeue()->msg};
-    if (!memcmp(&input, "Ping", sizeof("Ping"))) {
-      struct NRFMessage output = {"Pong"};
-      outgoingQueue.enqueue(&output);
+    NRFMessage temp = incomingQueue.dequeue();
+    Serial.print("Received: ");
+    Serial.println(temp.msg);
+    if (!memcmp(&(temp.msg[0]), "Ping", sizeof("Ping"))) {
+      outgoingQueue.enqueue(NRFMessage("Pong", sizeof("Pong")));
     }
   }
   if (!outgoingQueue.isEmpty()) {
       radio.stopListening();
-      char output[32] = { outgoingQueue.dequeue()->msg};
+      NRFMessage output = outgoingQueue.dequeue();
       Serial.print("Sending: ");
-      Serial.println(output);
-      radio.write(&output, sizeof(output));
+      Serial.println(output.msg);
+      radio.write(&(output.msg), sizeof(output.len));
   }
   delay(1000);
 }
