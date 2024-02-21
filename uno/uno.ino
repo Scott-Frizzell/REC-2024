@@ -5,6 +5,7 @@
 #include "NRFMessage.h"
 #include <Servo.h>
 
+#define BAUD_RATE 9600
 #define BUTTON_PRESSED HIGH
 #define BUTTON_UNPRESSED LOW
 #define SWITCH_CLOSED HIGH
@@ -23,7 +24,13 @@
 #define PIN_BRAKE2_SWITCH 10
 #define PIN_BRAKE3_SWITCH 11
 #define PIN_POWER_INDICATOR 12
-
+#define PIN_RESET_BUTTON 13
+#define SBRAKE1_ENGAGED 0
+#define SBRAKE1_DISENGAGED 90
+#define SBRAKE2_ENGAGED 0
+#define SBRAKE2_DISENGAGED 90
+#define SBRAKE3_ENGAGED 0
+#define SBRAKE3_DISENGAGED 90
 
 int states[9];
 ArduinoQueue<NRFMessage> outgoingQueue = ArduinoQueue<NRFMessage>(10);
@@ -36,7 +43,7 @@ const Servo SBrake2;
 const Servo SBrake3;
 
 void setup() {
-	Serial.begin(9600);
+	Serial.begin(BAUD_RATE);
 	radio.begin();
 }
 
@@ -45,14 +52,11 @@ void loop() {
 	switch (states[0]) {
 		case -1: // STATE E-STOP
 			break;
-		case 0:
-			// STATE 0 | INIT
+		case 0: // STATE 0 | INIT
 			break;
-		case 1:
-			// STATE 1 | STOPPED
+		case 1: // STATE 1 | STOPPED
 			break;
-		case 2:
-			// STATE 2 | RUNNING
+		case 2: // STATE 2 | RUNNING
 			break;
 	}
 	
@@ -107,25 +111,25 @@ void loop() {
 	// TASK 3 | BRAKE RUN 1
 	switch (states[3]) {
 		case -1: // STATE E-STOP
-			SBrake1.write(SBRAKE1_CLOSED);
+			SBrake1.write(SBRAKE1_ENGAGED);
 			if (digitalRead(PIN_ESTOP_BUTTON) == BUTTON_UNPRESSED && digitalRead(PIN_RESET_BUTTON) == BUTTON_PRESSED) {
 				states[3] = 1;
 			}
 			break;
 		case 0: // STATE 0 | INIT
 			SBrake1.attach(PIN_BRAKE1_SERVO);
-			SBrake1.write(SBRAKE1_CLOSED);
+			SBrake1.write(SBRAKE1_ENGAGED);
 			states[3] = 1;
 			break;
 		case 1: // STATE 1 | CLOSED
 			if (digitalRead(PIN_BRAKE1_SWITCH) == SWITCH_CLOSED) {
-				SBrake1.write(SBRAKE1_OPEN);
+				SBrake1.write(SBRAKE1_DISENGAGED);
 				states[3] = 2;
 			}
 			break;
 		case 2: // STATE 2 | OPEN
 			if (digitalRead(PIN_BRAKE1_SWITCH) == SWITCH_OPEN) {
-				SBrake1.write(SBRAKE1_CLOSED);
+				SBrake1.write(SBRAKE1_ENGAGED);
 				states[3] = 1;
 			}
 			break;
@@ -134,25 +138,25 @@ void loop() {
 	// TASK 4 | BRAKE RUN 2
 	switch (states[4]) {
 		case -1: // STATE E-STOP
-			SBrake2.write(SBRAKE2_CLOSED);
+			SBrake2.write(SBRAKE2_ENGAGED);
 			if (digitalRead(PIN_ESTOP_BUTTON) == BUTTON_UNPRESSED && digitalRead(PIN_RESET_BUTTON) == BUTTON_PRESSED) {
 				states[4] = 1;
 			}
 			break;
 		case 0: // STATE 0 | INIT
 			SBrake2.attach(PIN_BRAKE2_SERVO);
-			SBrake2.write(SBRAKE2_CLOSED);
+			SBrake2.write(SBRAKE2_ENGAGED);
 			states[4] = 1;
 			break;
 		case 1: // STATE 1 | CLOSED
 			if (digitalRead(PIN_BRAKE2_SWITCH) == SWITCH_CLOSED) {
-				SBrake2.write(SBRAKE2_OPEN);
+				SBrake2.write(SBRAKE2_DISENGAGED);
 				states[4] = 2;
 			}
 			break;
 		case 2: // STATE 2 | OPEN
 			if (digitalRead(PIN_BRAKE2_SWITCH) == SWITCH_OPEN) {
-				SBrake2.write(SBRAKE2_CLOSED);
+				SBrake2.write(SBRAKE2_ENGAGED);
 				states[4] = 1;
 			}
 			break;
@@ -161,25 +165,25 @@ void loop() {
 	// TASK 5 | BRAKE RUN 3
 	switch (states[5]) {
 		case -1: // STATE E-STOP
-			SBrake3.write(SBRAKE3_CLOSED);
+			SBrake3.write(SBRAKE3_ENGAGED);
 			if (digitalRead(PIN_ESTOP_BUTTON) == BUTTON_UNPRESSED && digitalRead(PIN_RESET_BUTTON) == BUTTON_PRESSED) {
 				states[5] = 1;
 			}
 			break;
 		case 0: // STATE 0 | INIT
 			SBrake3.attach(PIN_BRAKE3_SERVO);
-			SBrake3.write(SBRAKE3_CLOSED);
+			SBrake3.write(SBRAKE3_ENGAGED);
 			states[5] = 1;
 			break;
 		case 1: // STATE 1 | CLOSED
 			if (digitalRead(PIN_BRAKE3_SWITCH) == SWITCH_CLOSED) {
-				SBrake3.write(SBRAKE3_OPEN);
+				SBrake3.write(SBRAKE3_DISENGAGED);
 				states[5] = 2;
 			}
 			break;
 		case 2: // STATE 2 | OPEN
 			if (digitalRead(PIN_BRAKE3_SWITCH) == SWITCH_OPEN) {
-				SBrake3.write(SBRAKE3_CLOSED);
+				SBrake3.write(SBRAKE3_ENGAGED);
 				states[5] = 1;
 			}
 			break;
