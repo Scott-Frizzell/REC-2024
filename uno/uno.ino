@@ -4,12 +4,13 @@
 #include <ArduinoQueue.h>
 #include "NRFMessage.h"
 #include <Servo.h>
+#include "TrackSection.h"
 
 #define BAUD_RATE 9600
 #define BUTTON_PRESSED HIGH
 #define BUTTON_UNPRESSED LOW
-#define SWITCH_CLOSED HIGH
-#define SWITCH_OPEN LOW
+#define SWITCH_ON HIGH
+#define SWITCH_OFF LOW
 #define LED_ENABLED LOW
 #define LED_DISABLED HIGH
 #define PIN_CE 7
@@ -31,6 +32,11 @@
 #define SBRAKE2_DISENGAGED 90
 #define SBRAKE3_ENGAGED 0
 #define SBRAKE3_DISENGAGED 90
+#define SECTION_NUMBER 3
+#define CHECKPOINT_NUMBER 20
+#define SECTION1_START 0
+#define SECTION1_BRAKE 1
+#define SECTION1_END 4
 
 int states[9];
 ArduinoQueue<NRFMessage> outgoingQueue = ArduinoQueue<NRFMessage>(10);
@@ -41,9 +47,10 @@ const byte read_addr[6] = "00002";
 const Servo SBrake1;
 const Servo SBrake2;
 const Servo SBrake3;
+const TrackSection track[SECTION_NUMBER];
+const Checkpoint checkpoints[CHECKPOINT_NUMBER];
 
 void setup() {
-	Serial.begin(BAUD_RATE);
 	radio.begin();
 }
 
@@ -67,7 +74,7 @@ void loop() {
 			Serial.print("Sending: ");
 			Serial.println(msg);
 			radio.stopListening();
-			radio.write(&msg, sizeof(msg));
+			radio.write(&msg[0], sizeof(msg));
 			radio.startListening();
 			states[1] = 1;
 			break;
@@ -104,34 +111,120 @@ void loop() {
 				radio.read(&input, sizeof(input));
 				incomingQueue.enqueue(NRFMessage(&input[0], 32)); // I don't think we really need an incoming queue, we should just deal with messages as we get them
 				radio.flush_tx();
+
+				// TODO: a lot
+
+				// CHECKPOINT
+				if (!memcmp(&input[8], &"CHECKPNT", 8)) {
+					unsigned int temp = ((unsigned int) input[16]) >> 1;
+					if (temp < CHECKPOINT_NUMBER) {
+						checkpoints[temp].set((short) input[0]);
+					}
+				}
+
 			}
 			break;
+
+			// CHECKPOINT -> set(vehicleId)
 	}
 
-	// TASK 3 | BRAKE RUN 1
-	switch (states[3]) {
+	// TASK 3 | TRACK BLOCK 0
+	TrackSection section = track[0];
+	int state = states[3];
+	switch (state) {
+
 		case -1: // STATE E-STOP
-			SBrake1.write(SBRAKE1_ENGAGED);
+
+			section.engage(); // Engage brakes
+
+			// If E-Stop is unpressed and reset is pressed:
 			if (digitalRead(PIN_ESTOP_BUTTON) == BUTTON_UNPRESSED && digitalRead(PIN_RESET_BUTTON) == BUTTON_PRESSED) {
-				states[3] = 1;
+				
+				state = 1; // Move to State 1
+
 			}
+
 			break;
+			
 		case 0: // STATE 0 | INIT
-			SBrake1.attach(PIN_BRAKE1_SERVO);
-			SBrake1.write(SBRAKE1_ENGAGED);
-			states[3] = 1;
+
+			// Configure the section
+			section.configure(
+				PIN_BRAKE1_SERVO,
+				SBRAKE1_ENGAGED,
+				SBRAKE1_DISENGAGED,
+				SECTION1_START,
+				SECTION1_END,
+				SECTION1_BRAKE,
+				&track[1]
+			);
+
+			states[3] = 1; // Move to State 1
+
 			break;
-		case 1: // STATE 1 | CLOSED
-			if (digitalRead(PIN_BRAKE1_SWITCH) == SWITCH_CLOSED) {
-				SBrake1.write(SBRAKE1_DISENGAGED);
-				states[3] = 2;
+
+		case 1: // STATE 1 | STANDARD OPERATIONS
+
+			// If manual override switch is flipped:
+			if (digitalRead(PIN_BRAKE1_SWITCH) == SWITCH_ON) {
+
+				section.engage(); // Engage brakes
+
+				state = 2; // Move to State 2
+
+				break;
+
 			}
+
+			// If vehicle is waiting, and no vehicle is in the section, and the next section is not waiting:
+			if (section.waiting() && !section.vehicle() && !section.next()->waiting()) {
+
+				section.disengage(); // Disengage brakes
+
+				// TODO: Add failsafe re-engage if brake clear is missed
+			}
+
+			// If vehicle passes start checkpoint:
+			if (section.getStart()->test()) {
+
+				// This means 2 cars crashed into each other...
+				if (section.waiting()) {
+
+					estop_interrupt(); // So trigger an E-Stop (This should never happen)
+
+					break;
+
+				}
+				
+				section.wait(section.getStart()->clear()); // Set that vehicle as waiting
+
+			}
+
+			// If vehicle passes brake clear checkpoint:
+			if (section.getBrakeClear()->clear()) {
+
+				section.engage(); // Re-engage brakes
+
+			}
+
+			// If vehicle passes end checkpoint:
+			if (section.getEnd()->clear()) {
+
+				section.clear(); // Clear the section
+
+			}
+
 			break;
-		case 2: // STATE 2 | OPEN
-			if (digitalRead(PIN_BRAKE1_SWITCH) == SWITCH_OPEN) {
-				SBrake1.write(SBRAKE1_ENGAGED);
-				states[3] = 1;
+
+		case 2: // STATE 2 | MANUAL OVERRIDE
+
+			// If manual override switch is flipped back:
+			if (digitalRead(PIN_BRAKE1_SWITCH) == SWITCH_OFF) {
+				
+				state = 1; // Move to State 1
+
 			}
+
 			break;
 	}
 
@@ -148,14 +241,14 @@ void loop() {
 			SBrake2.write(SBRAKE2_ENGAGED);
 			states[4] = 1;
 			break;
-		case 1: // STATE 1 | CLOSED
-			if (digitalRead(PIN_BRAKE2_SWITCH) == SWITCH_CLOSED) {
+		case 1: // STATE 1 | STANDARD OPERATIONS
+			if (digitalRead(PIN_BRAKE2_SWITCH) == SWITCH_ON) {
 				SBrake2.write(SBRAKE2_DISENGAGED);
 				states[4] = 2;
 			}
 			break;
-		case 2: // STATE 2 | OPEN
-			if (digitalRead(PIN_BRAKE2_SWITCH) == SWITCH_OPEN) {
+		case 2: // STATE 2 | MANUAL OVERRIDE
+			if (digitalRead(PIN_BRAKE2_SWITCH) == SWITCH_OFF) {
 				SBrake2.write(SBRAKE2_ENGAGED);
 				states[4] = 1;
 			}
@@ -175,14 +268,14 @@ void loop() {
 			SBrake3.write(SBRAKE3_ENGAGED);
 			states[5] = 1;
 			break;
-		case 1: // STATE 1 | CLOSED
-			if (digitalRead(PIN_BRAKE3_SWITCH) == SWITCH_CLOSED) {
+		case 1: // STATE 1 | STANDARD OPERATIONS
+			if (digitalRead(PIN_BRAKE3_SWITCH) == SWITCH_ON) {
 				SBrake3.write(SBRAKE3_DISENGAGED);
 				states[5] = 2;
 			}
 			break;
-		case 2: // STATE 2 | OPEN
-			if (digitalRead(PIN_BRAKE3_SWITCH) == SWITCH_OPEN) {
+		case 2: // STATE 2 | MANUAL OVERRIDE
+			if (digitalRead(PIN_BRAKE3_SWITCH) == SWITCH_OFF) {
 				SBrake3.write(SBRAKE3_ENGAGED);
 				states[5] = 1;
 			}
@@ -194,6 +287,7 @@ void loop() {
 		case -1: // STATE E-STOP
 			break;
 		case 0: // STATE 0 | INIT
+			Serial.begin(BAUD_RATE);
 			break;
 		case 1: // STATE 1 | WRITE
 			break;

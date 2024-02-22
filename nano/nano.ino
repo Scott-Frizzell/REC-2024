@@ -111,7 +111,7 @@ void loop() {
             }
 			break;
 		case 2: // STATE 2 | RUNNING
-            if (digitalRead(PIN_HALL_ANGLE) == HALL_ANGLE_CENTERED) {
+            if (digitalRead(PIN_HALL_ANGLE) == HALL_ANGLE_CENTERED) { // This doesn't work
                 current_position = target_position;
                 digitalWrite(PIN_SOLENOID, SOLENOID_ENGAGED);
                 states[3] = 1;
