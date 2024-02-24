@@ -5,6 +5,7 @@ struct NRFMessage {
     for (int i = 0; i < _len; i++) {
       this->msg[i] = string[i];
     }
+    this->msg[_len] = 0;
   }
   NRFMessage() : msg(""), len(0) {}
 };

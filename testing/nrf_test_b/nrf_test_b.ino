@@ -25,23 +25,21 @@ void loop() {
   if (radio.available()) {
     char input[32] = "";
     radio.read(&input, sizeof(input));
-    incomingQueue.enqueue(NRFMessage(&input[0], 32));
-    radio.flush_tx();
-  }
-  if (!incomingQueue.isEmpty()) {
-    NRFMessage temp = incomingQueue.dequeue();
+    NRFMessage temp = NRFMessage(&(input[0]), 32);
     Serial.print("Received: ");
     Serial.println(temp.msg);
     if (!memcmp(&(temp.msg[0]), "Ping", sizeof("Ping"))) {
       outgoingQueue.enqueue(NRFMessage("Pong", sizeof("Pong")));
     }
+    radio.flush_tx();
   }
   if (!outgoingQueue.isEmpty()) {
-      radio.stopListening();
       NRFMessage output = outgoingQueue.dequeue();
       Serial.print("Sending: ");
       Serial.println(output.msg);
-      radio.write(&(output.msg), sizeof(output.len));
+      radio.stopListening();
+      radio.write(&(output.msg), output.len);
+      radio.startListening();
   }
   delay(1000);
 }
