@@ -90,9 +90,7 @@ bool lastStateSwitch2;
 int startHoldDown;
 
 
-void setup() {
-	radio.begin();
-}
+void setup() {} // All setup is done in respective state 0's
 
 void loop() {
 	// TASK 0 | GENERAL RIDE FLOW
@@ -100,6 +98,7 @@ void loop() {
 		case -1: // STATE E-STOP
 			break;
 		case 0: // STATE 0 | INIT
+			
 			expander.beginI2C();
 			expander.pinMode(PIN_ESTOP_BUTTON, INPUT);
 			expander.setupInterruptPin(PIN_ESTOP_BUTTON, HIGH);
@@ -112,7 +111,13 @@ void loop() {
 			expander.pinMode(PIN_THEMING_BUTTON, INPUT);
 			expander.pinMode(PIN_BRAKE2_SWITCH, INPUT);
 			expander.pinMode(PIN_BRAKE3_LED, OUTPUT);
-			
+			pinMode(PIN_BRAKE1_HALL, INPUT);
+			pinMode(PIN_BRAKE2_HALL, INPUT);
+			pinMode(PIN_BRAKE2_HALL, INPUT);
+			pinMode(PIN_ESTOP_INT, INPUT);
+			pinMode(PIN_ESTOP_REMOTE_INT, INPUT);
+			attachInterrupt(digitalPinToInterrupt(PIN_ESTOP_INT), estop_interrupt, HIGH);
+			attachInterrupt(digitalPinToInterrupt(PIN_ESTOP_REMOTE_INT), estop_interrupt, HIGH);
 			break;
 		case 1: // STATE 1 | STOPPED
 			break;
@@ -132,6 +137,7 @@ void loop() {
 			states[1] = 1;
 			break;
 		case 0: // STATE 0 | INIT
+			radio.begin();
 			radio.openWritingPipe(write_addr);
 			radio.setPALevel(RF24_PA_MIN);
 			states[1] = 1;
@@ -195,6 +201,7 @@ void loop() {
 				&& expander.digitalRead(PIN_THEMING_BUTTON) == BUTTON_PRESSED
 				&& expander.digitalRead(PIN_BRAKE0_SWITCH) == SWITCH_ON
 				&& expander.digitalRead(PIN_BRAKE0_SWITCH) != lastStateSwitch0
+				&& expander.digitalRead(PIN_ESTOP_BUTTON) == BUTTON_PRESSED
 			) {
 				track[0].disengage();
 				states[3] = 2;
@@ -255,6 +262,7 @@ void loop() {
 				&& expander.digitalRead(PIN_THEMING_BUTTON) == BUTTON_PRESSED
 				&& expander.digitalRead(PIN_BRAKE1_SWITCH) == SWITCH_ON
 				&& expander.digitalRead(PIN_BRAKE1_SWITCH) != lastStateSwitch1
+				&& expander.digitalRead(PIN_ESTOP_BUTTON) == BUTTON_PRESSED
 			) {
 				track[1].disengage();
 				states[4] = 2;
@@ -315,6 +323,7 @@ void loop() {
 				&& expander.digitalRead(PIN_THEMING_BUTTON) == BUTTON_PRESSED
 				&& expander.digitalRead(PIN_BRAKE2_SWITCH) == SWITCH_ON
 				&& expander.digitalRead(PIN_BRAKE2_SWITCH) != lastStateSwitch2
+				&& expander.digitalRead(PIN_ESTOP_BUTTON) == BUTTON_PRESSED
 			) {
 				track[2].disengage();
 				states[5] = 2;
@@ -375,6 +384,7 @@ void loop() {
 				&& expander.digitalRead(PIN_THEMING_BUTTON) == BUTTON_PRESSED
 				&& expander.digitalRead(PIN_START_BUTTON) == BUTTON_PRESSED
 				&& expander.digitalRead(PIN_START_BUTTON) != lastStateStart
+				&& expander.digitalRead(PIN_ESTOP_BUTTON) == BUTTON_PRESSED
 			) {
 				track[3].disengage();
 				states[6] = 2;
