@@ -20,9 +20,11 @@
 int states[4];
 ArduinoQueue<NRFMessage> outgoingQueue = ArduinoQueue<NRFMessage>(10);
 RF24 radio(PIN_CE, PIN_CSN);
+
 const byte write_addr[6] = "00002";
 const byte read_addr[6] = "00001";
 const Servo servo;
+
 int current_angle;
 int target_angle = SERVO_DEFAULT;
 int checkpoint = 0;

@@ -2,19 +2,17 @@
 #include "Checkpoint.h"
 
 class TrackSection {
-    //"""!
-    //A TrackSection object represents a track block. Each block has a leading brake section, and allows only one ride vehicle to enter the block at a time.
-    //"""
+    """!
+    A TrackSection object represents a track block. Each block has a leading brake section, and allows only one ride vehicle to enter the block at a time.
+    """
     private:
         Servo brakeRun;
         int id;
         int vehicleId;
         int stateDisengaged;
         int stateEngaged;
-        Checkpoint* checkStart;
         Checkpoint* checkEnd;
-        Checkpoint* checkBrakeClear;
-        int waitingId;
+        Checkpoint* checkBrake;
         TrackSection* nextSection;
     public:
         TrackSection() {
@@ -27,18 +25,16 @@ class TrackSection {
                 int servoPin,
                 int _stateDisengaged,
                 int _stateEngaged,
-                Checkpoint* _checkStart,
                 Checkpoint* _checkEnd,
-                Checkpoint* _checkBrakeClear,
+                Checkpoint* _checkBrake,
                 TrackSection* _next
             )
         {
             brakeRun.attach(servoPin);
             stateDisengaged = _stateDisengaged;
             stateEngaged = _stateEngaged;
-            checkStart = _checkStart;
             checkEnd = _checkEnd;
-            checkBrakeClear = _checkBrakeClear;
+            checkBrake = _checkBrake;
             nextSection = _next;
             engage();
         }
@@ -55,19 +51,13 @@ class TrackSection {
     
         void disengage() {
             brakeRun.write(stateDisengaged);
-            vehicleId = waitingId;
-            waitingId = 0;
         }
-    
-        bool waiting() { return waitingId; }
         
         TrackSection* next() { return nextSection; }
 
-        Checkpoint* getStart() { return checkStart; }
-
         Checkpoint* getEnd() { return checkEnd; }
 
-        Checkpoint* getBrakeClear() { return checkBrakeClear; }
+        Checkpoint* getBrake() { return checkBrake; }
 
-        void wait(int _id) { waitingId = _id; }
+        void setVehicle(int _id) { vehicleId = _id; }
 };
