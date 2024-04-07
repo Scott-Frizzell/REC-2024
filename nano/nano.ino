@@ -1,3 +1,5 @@
+// TODO: Raise EStop if too long between checkpoints
+
 #include <SPI.h>
 #include <nRF24L01.h>
 #include <RF24.h>
@@ -6,8 +8,8 @@
 #include <Servo.h>
 
 #define BAUD_RATE 9600
-#define PIN_CE 7
-#define PIN_CSN 8
+#define PIN_CE 8
+#define PIN_CSN 7
 #define PIN_SERVO 4
 #define PIN_HALL 2
 #define PIN_BATTERY A0
@@ -29,17 +31,19 @@ byte vehicle_id;
 unsigned long armed;
 int battery = 100;
 
-void setup() {
-    Serial.begin(BAUD_RATE);
-	radio.begin();
-}
+void setup() {} // All setup is done in respective state 0's
 
 void loop() {
 	// TASK 0 | GENERAL RIDE FLOW
 	switch (states[0]) {
 		case -1: // STATE E-STOP
+			if ((analogRead(PIN_BATTERY) - 2.5) * 200 != battery) {
+				battery = (analogRead(PIN_BATTERY) - 2.5) * 200;
+				outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "BAT", battery, 4), 32));
+			}
 			break;
 		case 0: // STATE 0 | INIT
+			Serial.begin(BAUD_RATE);
 			pinMode(PIN_HALL, INPUT_PULLUP);
 			pinMode(PIN_BATTERY, INPUT);
 			attachInterrupt(digitalPinToInterrupt(PIN_HALL), hall_effect_interrupt, CHANGE);
@@ -75,6 +79,7 @@ void loop() {
             states[1] = 1;
 			break;
 		case 0: // STATE 0 | INIT
+			radio.begin();
 			radio.openWritingPipe(write_addr);
 			radio.setPALevel(RF24_PA_MIN);
 			states[1] = 1;
@@ -103,7 +108,7 @@ void loop() {
 			break;
 		case 1: // STATE 1 | RECEIVE
 			if (radio.available()) {
-				char input[32] = "";
+				char input[32];
 				radio.read(&input, sizeof(input));
 				if (!memcmp(&input[5], "STP", 3)) {
 					// E-STOP
