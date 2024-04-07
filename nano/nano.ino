@@ -8,24 +8,26 @@
 #define BAUD_RATE 9600
 #define PIN_CE 7
 #define PIN_CSN 8
-#define PIN_SERVO 1
-#define PIN_SOLENOID 2
-#define PIN_HALL_POSITION 3
-#define PIN_HALL_ANGLE 4
+#define PIN_SERVO 4
+#define PIN_HALL 2
+#define PIN_BATTERY A0
 #define SERVO_DEFAULT 0
-#define SOLENOID_ENGAGED LOW
-#define SOLENOID_DISENGAGED HIGH
-#define HALL_ANGLE_CENTERED HIGH
+#define CHECKPOINTS 10
+#define HALL_DELAY 250
 
 int states[4];
 ArduinoQueue<NRFMessage> outgoingQueue = ArduinoQueue<NRFMessage>(10);
-ArduinoQueue<NRFMessage> incomingQueue = ArduinoQueue<NRFMessage>(10);
 RF24 radio(PIN_CE, PIN_CSN);
 const byte write_addr[6] = "00002";
 const byte read_addr[6] = "00001";
 const Servo servo;
-int current_position;
-int target_position = SERVO_DEFAULT;
+int current_angle;
+int target_angle = SERVO_DEFAULT;
+int checkpoint = 0;
+int angles[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+byte vehicle_id;
+unsigned long armed;
+int battery = 100;
 
 void setup() {
     Serial.begin(BAUD_RATE);
@@ -38,17 +40,33 @@ void loop() {
 		case -1: // STATE E-STOP
 			break;
 		case 0: // STATE 0 | INIT
+			pinMode(PIN_HALL, INPUT_PULLUP);
+			pinMode(PIN_BATTERY, INPUT);
+			attachInterrupt(digitalPinToInterrupt(PIN_HALL), hall_effect_interrupt, CHANGE);
+			outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "NEW", 0, 0), 32));
+			states[0] = 1;
 			break;
-		case 1: // STATE 1 | STOPPED
+		case 1: // STATE 1 | WAIT FOR CONNECTION
+			if (vehicle_id == 0) {
+				outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "NEW", 0, 0), 32));
+			}
 			break;
-		case 2: // STATE 2 | RUNNING
+		case 2: // STATE 2 | NORMAL OPERATION
+			if (target_angle != angles[checkpoint]) {
+				target_angle = angles[checkpoint];
+				outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "ANG", target_angle, 4), 32));
+			}
+			if ((analogRead(PIN_BATTERY) - 2.5) * 200 != battery) {
+				battery = (analogRead(PIN_BATTERY) - 2.5) * 200;
+				outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "BAT", battery, 4), 32));
+			}
 			break;
 	}
 	
 	// TASK 1 | NRF SEND
 	switch (states[1]) {
 		case -1: // STATE E-STOP
-            char msg[] = "ESTOP"; // TODO
+            char msg[] = "ESTOP";
 			Serial.print("Sending: ");
 			Serial.println(msg);
 			radio.stopListening();
@@ -87,7 +105,25 @@ void loop() {
 			if (radio.available()) {
 				char input[32] = "";
 				radio.read(&input, sizeof(input));
-				incomingQueue.enqueue(NRFMessage(&input[0], 32)); // I don't think we really need an incoming queue, we should just deal with messages as we get them
+				if (!memcmp(&input[5], "STP", 3)) {
+					// E-STOP
+					estop_interrupt();
+				} else if (!memcmp(&input[5], "PNG", 3)) {
+					// PING
+					// Do nothing, RF24 automatically acknowledges
+				} else if (!memcmp(&input[5], "CLR", 3)) {
+					// CLEAR E-STOP
+					states[0] = 2;
+					states[3] = 1;
+				} else if (!memcmp(&input[5], "NEW", 3)) {
+					// NEW VEHICLE
+					if (!memcmp(&input[4], 0, 1)) {
+						memcpy(&vehicle_id, &input[8], 1);
+					}
+				} else {
+					// BAD MESSAGE
+					// Do nothing
+				}
 				radio.flush_tx();
 			}
 			break;
@@ -100,21 +136,12 @@ void loop() {
 		case 0: // STATE 0 | INIT
             servo.attach(PIN_SERVO);
             servo.write(SERVO_DEFAULT);
-            digitalWrite(PIN_SOLENOID, SOLENOID_DISENGAGED);
-            states[3] = 2;
+            states[3] = 1;
 			break;
-		case 1: // STATE 1 | STOPPED
-            if (current_position !== target_position) {
-                digitalWrite(PIN_SOLENOID, SOLENOID_DISENGAGED);
-                servo.write(target_position);
-                states[3] = 2;
-            }
-			break;
-		case 2: // STATE 2 | RUNNING
-            if (digitalRead(PIN_HALL_ANGLE) == HALL_ANGLE_CENTERED) { // This doesn't work
-                current_position = target_position;
-                digitalWrite(PIN_SOLENOID, SOLENOID_ENGAGED);
-                states[3] = 1;
+		case 1: // STATE 1 | NORMAL OPERATION
+            if (current_angle != target_angle) {
+                servo.write(target_angle);
+				current_angle = target_angle;
             }
 			break;
 	}
@@ -128,5 +155,19 @@ void estop_interrupt() {
 }
 
 void hall_effect_interrupt() {
+	if (digitalRead(PIN_HALL) && millis() - armed > HALL_DELAY) {
+		checkpoint = (checkpoint + 1) % CHECKPOINTS;
+		armed = millis();
+		outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "LOC", checkpoint, 4), 32));
+	}
     return;
+}
+
+char* createString(unsigned long msg_id, byte vehicle_id, char* type, byte* data, int length) {
+	char* s = malloc(32);
+	memcpy(s, &(msg_id) + 12, 4);
+	memcpy(s + 4, &vehicle_id, 1);
+	memcpy(s + 5, type, 3);
+	memcpy(s + 8, data, length);
+	return s;
 }

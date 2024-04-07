@@ -7,7 +7,6 @@
 RF24 radio(7, 8);
 
 ArduinoQueue<NRFMessage> outgoingQueue = ArduinoQueue<NRFMessage>(10);
-ArduinoQueue<NRFMessage> incomingQueue = ArduinoQueue<NRFMessage>(10);
 
 const byte writeaddr[6] = "00002";
 const byte readaddr[6] = "00001";
