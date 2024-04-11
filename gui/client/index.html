@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<head>
+    <title>REC GUI</title>
+    <link href="./css/index.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <!-- TODO: POWER OFF OVERLAY -->
+    <div id="header-container">
+        <div id="global-indicator"></div>
+        <h1>Online</h1>
+        <p>Chaos on Candy Mountain</p>
+    </div>
+    <div id="grid-container">
+        <div class="grid-item" id="image1" data-color="#ffb300"><img src="resource/mastercaution.png" alt="Image 1"></div>
+        <div class="grid-item" id="image2" data-color="#ffb300"><img src="resource/lowbattery.png" alt="Image 2"></div>
+        <div class="grid-item" id="image3" data-color="#ffb300"><img src="resource/missedping.png" alt="Image 3"></div>
+        <div class="grid-item" id="image4" data-color="#ffb300"><img src="resource/overspeed.png" alt="Image 4"></div>
+        <div class="grid-item" id="image5" data-color="#ffb300"><img src="resource/brakeoverride.png" alt="Image 5"></div>
+        <div class="grid-item" id="image6" data-color="#ffb300"><img src="resource/missedcheckpt.png" alt="Image 6"></div>
+        <div class="grid-item" id="image7" data-color="#ffb300"><img src="resource/master_caution.png" alt="Image 7"></div>
+        <div class="grid-item" id="image8" data-color="#ff2f00"><img src="resource/masterwarn.png" alt="Image 8"></div>
+        <div class="grid-item" id="image9" data-color="#ff2f00"><img src="resource/deadbattery.png" alt="Image 9"></div>
+        <div class="grid-item" id="image10" data-color="#ff2f00"><img src="resource/disconnect.png" alt="Image 10"></div>
+        <div class="grid-item" id="image11" data-color="#ff2f00"><img src="resource/stall.png" alt="Image 11"></div>
+        <div class="grid-item" id="image12" data-color="#ff2f00"><img src="resource/brakefailure.png" alt="Image 12"></div>
+        <div class="grid-item" id="image13" data-color="#ff2f00"><img src="resource/emergencystop.png" alt="Image 13"></div>
+        <div class="grid-item" id="image14" data-color="#ff2f00"><img src="resource/master_warn.png" alt="Image 14"></div>
+    </div>
+    <div id="track-container">
+        <div id="track-stats">
+            <p id="stat-time">Time since last launch: 0:32</p>
+            <p id="stat-launches">Launches this hour: 17</p>
+            <p id="stat-last-launches">Launches last hour: 23</p>
+        </div>
+        <!-- TODO: EMERGENCY STOP OVERLAY -->
+    </div>
+    <div id="vehicles-container">
+        <div id="vehicles-scrollbar" class="scrollbar" data-pos="10" data-lastPos="10"></div>
+        <!-- TODO: VEHICLE BATTERY PERCENT, ANGLE -->
+    </div>
+    <div id="sections-container">
+        <div id="sections-scrollbar" class="scrollbar" data-pos="10" data-lastPos="10"></div>
+    </div>
+    <div id="video-container">
+        <video id="videoFeed" autoplay playsinline></video>
+      </div>
+    <script src="index.js"></script>
+</body>

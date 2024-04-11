@@ -1,0 +1,11 @@
+{
+    "include": ["./src/**/*"],
+    "compilerOptions": {
+        "module": "ESNext",
+        "target": "ESNext",
+        "outDir": "./out/",
+        "resolveJsonModule": true,
+        "moduleResolution": "Node",
+        "allowSyntheticDefaultImports": true,
+    }
+}

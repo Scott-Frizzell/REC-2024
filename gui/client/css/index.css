@@ -1,0 +1,239 @@
+body {
+    background-color: #1e1e1e;
+    user-select: none;
+}
+
+#header-container {
+    position: absolute;
+    top: 2vh;
+    left: 2vw;
+    height: 12vh;
+    width: 16vw;
+    border: 5px solid #3e3e3e;
+    border-radius: 1vw;
+    padding: 5vh 2vw;
+    color: #e0e0e0;
+    font-family: sans-serif;
+    font-weight: bolder;
+}
+
+#global-indicator {
+    display: inline-block;
+    width: max(2.5vw, 60px);
+    height: max(2.5vw, 60px);
+    background-color: lawngreen;
+    border-radius: 50%;
+    filter: drop-shadow(0px 0px 20px green) blur(1px);
+    vertical-align: bottom;
+}
+
+#header-container > h1 {
+    display: inline;
+    margin: 0;
+    max-width: 12vw;
+    font-size: 2.5vw;
+    padding-left: 30px;
+    padding-bottom: 10px;
+    text-transform: uppercase;
+}
+
+#header-container > p {
+    padding-top: 20px;
+    font-size: 1vw;
+    margin: 0;
+    width: 100%;
+    text-align: right;
+}
+
+#grid-container {
+    position: absolute;
+    top: 2vh;
+    right: 2vw;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr); /* 7 columns */
+    grid-template-rows: repeat(2, 1fr); /* 2 rows */
+    grid-gap: 2vh 2vw; /* Padding between each image */
+    width: 70vw;
+    height: 20vh; /* 20% of the viewport height */
+    padding: 1vh 2vw;
+    border: 5px solid #3e3e3e;
+    border-radius: 1vw;
+    box-sizing: content-box;
+}
+  
+.grid-item {
+    position: relative;
+    filter: saturate(0%) brightness(0%);
+}
+  
+.grid-item img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+}
+
+#track-container {
+    color: #e0e0e0;
+    font-family: sans-serif;
+    font-weight: bolder;
+    position: absolute;
+    bottom: 2vh;
+    left: 2vw;
+    height: 68vh;
+    width: 59.5vw;
+    border: 5px solid #3e3e3e;
+    border-radius: 1vw;
+    padding: 1vh 2vw;
+    background-image: url("../resource/track.png");
+    background-size: 100% 100%;
+}
+
+#track-stats {
+    position: absolute;
+    top: 2vh;
+    right: 1vw;
+    padding: 2vh 1vw;
+    border: 5px solid #3e3e3e;
+    border-radius: 1vw;
+    text-align: left;
+    width: 250px;
+    background-color: #282828;
+}
+
+.brake {
+    position: absolute;
+    width: max(1vw, 20px);
+    height: max(1vw, 20px);
+    background-color: red;
+    border-radius: 50%;
+    filter: drop-shadow(0px 0px 8px red) blur(1px);
+}
+
+.track-vehicle {
+    height: 6vh;
+    position: absolute;
+    filter: drop-shadow(0px 0px 4px black);
+}
+
+.track-vehicle > img {
+    height: 100%;
+}
+
+#vehicles-container {
+    position: absolute;
+    bottom: 38vh;
+    right: 18vw;
+    height: 34vh;
+    width: 14vw;
+    border: 5px solid #3e3e3e;
+    border-radius: 1vw;
+    overflow: hidden;
+}
+
+.vehicle {
+    padding: 2vh 1vw;
+    color: #e0e0e0;
+    font-family: sans-serif;
+    font-weight: bolder;
+    border-bottom: 2px solid #6e6e6e;
+    background-color: #282828;
+}
+
+.vehicle > h1 {
+    display: inline-block;
+    margin: 0;
+    max-width: 12vw;
+    font-size: 1.5vw;
+    padding-left: 10px;
+    padding-bottom: 10px;
+}
+
+.vehicle > p {
+    padding-top: 10px;
+    margin: 0;
+}
+
+.vehicle > div {
+    display: inline-block;
+    width: max(1vw, 20px);
+    height: max(1vw, 20px);
+    background-color: lawngreen;
+    border-radius: 50%;
+    filter: drop-shadow(0px 0px 8px lawngreen) blur(1px);
+}
+
+#sections-container {
+    position: absolute;
+    bottom: 38vh;
+    right: 2vw;
+    height: 34vh;
+    width: 14vw;
+    border: 5px solid #3e3e3e;
+    border-radius: 1vw;
+    overflow: hidden;
+    
+}
+
+.track-section {
+    padding: 2vh 1vw;
+    color: #e0e0e0;
+    font-family: sans-serif;
+    font-weight: bolder;
+    border-bottom: 2px solid #6e6e6e;
+    background-color: #282828;
+}
+
+.track-section > h1 {
+    display: inline-block;
+    margin: 0;
+    max-width: 12vw;
+    font-size: 1.5vw;
+    padding-left: 10px;
+}
+
+.track-section > p {
+    padding-top: 20px;
+    margin: 0;
+}
+
+.track-section > div {
+    display: inline-block;
+    width: max(1vw, 20px);
+    height: max(1vw, 20px);
+    background-color: lawngreen;
+    border-radius: 50%;
+    filter: drop-shadow(0px 0px 8px lawngreen) blur(1px);
+}
+
+
+.scrollbar {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    width: 6px;
+    height: 50px;
+    border-radius: 3px;
+    background-color: #6e6e6e;
+    opacity: 80%;
+}
+
+#video-container {
+    position: fixed;
+    bottom: 2vh;
+    right: 2vw;
+    margin: 0px;
+    width: 30vw;
+    height: 32.4vh;
+    border-radius: 1vw;
+    border: 5px solid #3e3e3e;
+    overflow: hidden;
+}
+  
+#videoFeed {
+    object-fit: fill;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
