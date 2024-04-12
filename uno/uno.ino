@@ -6,9 +6,11 @@
 #include <Adafruit_I2CDevice.h>
 #include <Adafruit_I2CRegister.h>
 #include <Adafruit_SPIDevice.h>
+#include <Adafruit_MCP23X17.h>
 #include "NRFMessage.h"
 #include <Servo.h>
 #include "TrackSection.h"
+#include "RideVehicle.h"
 
 // CONSTANTS
 #define BAUD_RATE 9600
@@ -66,10 +68,13 @@
 #define SECTION3_BRAKE -1
 #define SECTION3_END 10
 #define LONG_PRESS_DURATION 2000
+#define BRAKE1_CUTOFF 500
+#define BRAKE2_CUTOFF 500
+#define BRAKE3_CUTOFF 500
+#define MAX_VEHICLES 2
 
-int states[10];
+int states[9];
 ArduinoQueue<NRFMessage> outgoingQueue = ArduinoQueue<NRFMessage>(10);
-ArduinoQueue<NRFMessage> incomingQueue = ArduinoQueue<NRFMessage>(10);
 RF24 radio(PIN_CE, PIN_CSN);
 const byte write_addr[6] = "00001";
 const byte read_addr[6] = "00002";
@@ -81,6 +86,7 @@ const Servo Theming;
 const Adafruit_MCP23X17 expander;
 const TrackSection track[SECTION_NUMBER];
 const Checkpoint checkpoints[CHECKPOINT_NUMBER];
+const RideVehicle vehicles[MAX_VEHICLES];
 bool lastStateStart;
 bool lastStateReset;
 bool lastStateTheming;
@@ -96,9 +102,9 @@ void loop() {
 	// TASK 0 | GENERAL RIDE FLOW
 	switch (states[0]) {
 		case -1: // STATE E-STOP
+			states[0] = 1;
 			break;
 		case 0: // STATE 0 | INIT
-			
 			expander.beginI2C();
 			expander.pinMode(PIN_ESTOP_BUTTON, INPUT);
 			expander.setupInterruptPin(PIN_ESTOP_BUTTON, HIGH);
@@ -118,10 +124,13 @@ void loop() {
 			pinMode(PIN_ESTOP_REMOTE_INT, INPUT);
 			attachInterrupt(digitalPinToInterrupt(PIN_ESTOP_INT), estop_interrupt, HIGH);
 			attachInterrupt(digitalPinToInterrupt(PIN_ESTOP_REMOTE_INT), estop_interrupt, HIGH);
+			states[0] = 1;
 			break;
-		case 1: // STATE 1 | STOPPED
-			break;
-		case 2: // STATE 2 | RUNNING
+		case 1: // STATE 1 | NORMAL OPERATIONS
+			expander.digitalWrite(PIN_BRAKE1_LED, (analogRead(PIN_BRAKE1_HALL) > BRAKE1_CUTOFF ? LED_ENABLED : LED_DISABLED));
+			expander.digitalWrite(PIN_BRAKE2_LED, (analogRead(PIN_BRAKE2_HALL) > BRAKE2_CUTOFF ? LED_ENABLED : LED_DISABLED));
+			expander.digitalWrite(PIN_BRAKE3_LED, (analogRead(PIN_BRAKE3_HALL) > BRAKE3_CUTOFF ? LED_ENABLED : LED_DISABLED));
+			
 			break;
 	}
 	
@@ -168,19 +177,50 @@ void loop() {
 			if (radio.available()) {
 				char input[32] = "";
 				radio.read(&input, sizeof(input));
-				incomingQueue.enqueue(NRFMessage(&input[0], 32)); // I don't think we really need an incoming queue, we should just deal with messages as we get them
 				radio.flush_tx();
-
-				// TODO: a lot
-
-				// CHECKPOINT
-				if (!memcmp(&input[5], &"PNT", 3)) {
-					unsigned int temp = ((unsigned int) input[16]) >> 1;
-					if (temp < CHECKPOINT_NUMBER) {
-						checkpoints[temp].set((short) input[0]);
+				// ESTOP
+				if (!memcmp(&input[5], "STP", 3)) {
+					estop_interrupt();
+				} else if (!memcmp(&input[5], "NEW", 3)) {
+					byte temp = (byte) *(&millis()+31);
+					for (int i = 0; i < MAX_VEHICLES; i++) {
+						if (vehicles[i].getId() == -1) {
+							vehicles[i] = RideVehicle(temp);
+							outgoingQueue.enqueue(createString(millis(), 0, "NEW", temp, 1));
+							break;
+						}
+					}
+				} else if (!memcmp(&input[5], &"LOC", 3)) {
+					byte vehicle = (byte) input[4];
+					int loc = (int) input[8];
+					for (int i = 0; i < MAX_VEHICLES; i++) {
+						if (vehicles[i].getId() == vehicle) {
+							vehicles[i].setLocation(loc);
+							checkpoints[loc].set(vehicle);
+							break;
+						}
+					}
+				} else if (!memcmp(&input[5], &"ANG", 3)) {
+					byte vehicle = (byte) input[4];
+					int ang = (int) input[8];
+					for (int i = 0; i < MAX_VEHICLES; i++) {
+						if (vehicles[i].getId() == vehicle) {
+							vehicles[i].getAngle(ang);
+							Serial.println("{ type:\"ang\", data: { id:" + vehicle + ", ang:" + ang + "} }");
+							break;
+						}
+					}
+				} else if (!memcmp(&input[5], &"BAT", 3)) {
+					byte vehicle = (byte) input[4];
+					int bat = (int) input[8];
+					for (int i = 0; i < MAX_VEHICLES; i++) {
+						if (vehicles[i].getId() == vehicle) {
+							vehicles[i].setBattery(bat);
+							Serial.println("{ type:\"bat\", data: { id:" + vehicle + ", bat:" + bat + "} }");
+							break;
+						}
 					}
 				}
-
 			}
 			break;
 
@@ -449,6 +489,8 @@ void loop() {
 	// TASK 7 | SERIAL WRITE
 	switch (states[7]) {
 		case -1: // STATE E-STOP
+			Serial.println("{type:\"EStop\"}");
+			states[7] = 1;
 			break;
 		case 0: // STATE 0 | INIT
 			Serial.begin(BAUD_RATE);
