@@ -32,6 +32,7 @@ void loop() {
     }
     radio.flush_tx();
   }
+  Serial.println(radio.isChipConnected());
   if (!outgoingQueue.isEmpty()) {
       NRFMessage output = outgoingQueue.dequeue();
       Serial.print("Sending: ");
