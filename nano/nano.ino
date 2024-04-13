@@ -1,5 +1,3 @@
-// TODO: Raise EStop if too long between checkpoints
-
 #include <SPI.h>
 #include <nRF24L01.h>
 #include <RF24.h>
@@ -29,8 +27,9 @@ int current_angle;
 int target_angle = SERVO_DEFAULT;
 int checkpoint = 0;
 int angles[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+int durations[] = { 500, 500, 500, 500, 500, 500, 500, 500, 500, 20000 };
 byte vehicle_id;
-unsigned long armed;
+unsigned long lastInt;
 int battery = 100;
 
 void setup() {} // All setup is done in respective state 0's
@@ -39,8 +38,8 @@ void loop() {
 	// TASK 0 | GENERAL RIDE FLOW
 	switch (states[0]) {
 		case -1: // STATE E-STOP
-			if ((analogRead(PIN_BATTERY) - 2.5) * 200 != battery) {
-				battery = (analogRead(PIN_BATTERY) - 2.5) * 200;
+			if ((5*analogRead(PIN_BATTERY)/1023 - 2.5) * 200 != battery) {
+				battery = (5*analogRead(PIN_BATTERY)/1023 - 2.5) * 200;
 				outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "BAT", battery, 4), 32));
 			}
 			break;
@@ -53,8 +52,8 @@ void loop() {
 			states[0] = 1;
 			break;
 		case 1: // STATE 1 | WAIT FOR CONNECTION
-			if (vehicle_id == 0) {
-				outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "NEW", 0, 0), 32));
+			if (vehicle_id != 0) {
+				states[0] = 2;
 			}
 			break;
 		case 2: // STATE 2 | NORMAL OPERATION
@@ -62,23 +61,26 @@ void loop() {
 				target_angle = angles[checkpoint];
 				outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "ANG", target_angle, 4), 32));
 			}
-			if ((analogRead(PIN_BATTERY) - 2.5) * 200 != battery) {
-				battery = (analogRead(PIN_BATTERY) - 2.5) * 200;
+			if ((5*analogRead(PIN_BATTERY)/1023 - 2.5) * 200 != battery) {
+				battery = (5*analogRead(PIN_BATTERY)/1023 - 2.5) * 200;
 				outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "BAT", battery, 4), 32));
 			}
+      if (millis() - lastInt > durations[checkpoint]) {
+         estop_interrupt();
+      }
 			break;
 	}
 	
 	// TASK 1 | NRF SEND
 	switch (states[1]) {
 		case -1: // STATE E-STOP
-            char msg[] = "ESTOP";
+      char msg[] = "STP";
 			Serial.print("Sending: ");
 			Serial.println(msg);
 			radio.stopListening();
 			radio.write(&msg, sizeof(msg));
 			radio.startListening();
-            states[1] = 1;
+      states[1] = 1;
 			break;
 		case 0: // STATE 0 | INIT
 			radio.begin();
@@ -124,9 +126,7 @@ void loop() {
 					states[3] = 1;
 				} else if (!memcmp(&input[5], "NEW", 3)) {
 					// NEW VEHICLE
-					if (!memcmp(&input[4], 0, 1)) {
-						memcpy(&vehicle_id, &input[8], 1);
-					}
+					memcpy(&vehicle_id, &input[8], 1);
 				} else {
 					// BAD MESSAGE
 					// Do nothing
@@ -146,10 +146,10 @@ void loop() {
             states[3] = 1;
 			break;
 		case 1: // STATE 1 | NORMAL OPERATION
-            if (current_angle != target_angle) {
-                servo.write(target_angle);
+      if (current_angle != target_angle) {
+        servo.write(target_angle);
 				current_angle = target_angle;
-            }
+      }
 			break;
 	}
 }
@@ -162,19 +162,19 @@ void estop_interrupt() {
 }
 
 void hall_effect_interrupt() {
-	if (digitalRead(PIN_HALL) && millis() - armed > HALL_DELAY) {
+	if (digitalRead(PIN_HALL) && millis() - lastInt > HALL_DELAY) {
 		checkpoint = (checkpoint + 1) % CHECKPOINTS;
-		armed = millis();
+		lastInt = millis();
 		outgoingQueue.enqueue(NRFMessage(createString(millis(), vehicle_id, "LOC", checkpoint, 4), 32));
 	}
-    return;
+  return;
 }
 
-char* createString(unsigned long msg_id, byte vehicle_id, char* type, byte* data, int length) {
-	char* s = malloc(32);
-	memcpy(s, &(msg_id) + 12, 4);
+char* createString(unsigned long msg_id, byte vehicle_id, char* type, byte* data, int len) {
+	char s[32];
+	memcpy(s, &(msg_id) + 60, 4);
 	memcpy(s + 4, &vehicle_id, 1);
 	memcpy(s + 5, type, 3);
-	memcpy(s + 8, data, length);
+	memcpy(s + 8, data, len);
 	return s;
 }

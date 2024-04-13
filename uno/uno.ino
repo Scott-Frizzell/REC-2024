@@ -72,8 +72,9 @@
 #define BRAKE2_CUTOFF 500
 #define BRAKE3_CUTOFF 500
 #define MAX_VEHICLES 2
+#define TASKS 8
 
-int states[9];
+int states[TASKS];
 ArduinoQueue<NRFMessage> outgoingQueue = ArduinoQueue<NRFMessage>(10);
 RF24 radio(PIN_CE, PIN_CSN);
 const byte write_addr[6] = "00001";
@@ -102,9 +103,11 @@ void loop() {
 	// TASK 0 | GENERAL RIDE FLOW
 	switch (states[0]) {
 		case -1: // STATE E-STOP
+      Serial.println("{type:\"EStop\"}");
 			states[0] = 1;
 			break;
 		case 0: // STATE 0 | INIT
+      Serial.begin(BAUD_RATE);
 			expander.beginI2C();
 			expander.pinMode(PIN_ESTOP_BUTTON, INPUT);
 			expander.setupInterruptPin(PIN_ESTOP_BUTTON, HIGH);
@@ -127,9 +130,9 @@ void loop() {
 			states[0] = 1;
 			break;
 		case 1: // STATE 1 | NORMAL OPERATIONS
-			expander.digitalWrite(PIN_BRAKE1_LED, (analogRead(PIN_BRAKE1_HALL) > BRAKE1_CUTOFF ? LED_ENABLED : LED_DISABLED));
-			expander.digitalWrite(PIN_BRAKE2_LED, (analogRead(PIN_BRAKE2_HALL) > BRAKE2_CUTOFF ? LED_ENABLED : LED_DISABLED));
-			expander.digitalWrite(PIN_BRAKE3_LED, (analogRead(PIN_BRAKE3_HALL) > BRAKE3_CUTOFF ? LED_ENABLED : LED_DISABLED));
+			expander.digitalWrite(PIN_BRAKE1_LED, (analogRead(PIN_BRAKE1_HALL) < BRAKE1_CUTOFF ? LED_ENABLED : LED_DISABLED));
+			expander.digitalWrite(PIN_BRAKE2_LED, (analogRead(PIN_BRAKE2_HALL) < BRAKE2_CUTOFF ? LED_ENABLED : LED_DISABLED));
+			expander.digitalWrite(PIN_BRAKE3_LED, (analogRead(PIN_BRAKE3_HALL) < BRAKE3_CUTOFF ? LED_ENABLED : LED_DISABLED));
 			
 			break;
 	}
@@ -223,8 +226,6 @@ void loop() {
 				}
 			}
 			break;
-
-			// CHECKPOINT -> set(vehicleId)
 	}
 
 	// TASK 3 | TRACK BLOCK 0
@@ -273,7 +274,7 @@ void loop() {
 				track[0].getBrake()->clear(); // Clear brake point;
 			}
 			// If vehicle passes end point:
-			if (track[0].getEnd()->test()) {
+			if (track[0].getEnd()->clear()) {
 				track[0].next()->setVehicle(track[0].vehicle()); // Put vehicle to next section
 				track[0].clear(); // Clear section
 				track[0].engage(); // Engage brakes
@@ -285,6 +286,11 @@ void loop() {
 				track[0].engage();
 				states[3] = 1; // Move to State 1
 			}
+     // If vehicle passes end point:
+     if (track[0].getEnd()->clear()) {
+        track[0].next()->setVehicle(track[0].vehicle()); // Put vehicle to next section
+        track[0].clear(); // Clear section
+      }
 			break;
 	}
 
@@ -346,6 +352,11 @@ void loop() {
 				track[1].engage();
 				states[4] = 1; // Move to State 1
 			}
+     // If vehicle passes end point:
+     if (track[1].getEnd()->test()) {
+        track[1].next()->setVehicle(track[1].vehicle()); // Put vehicle to next section
+        track[1].clear(); // Clear section
+      }
 			break;
 	}
 
@@ -407,6 +418,11 @@ void loop() {
 				track[2].engage();
 				states[5] = 1; // Move to State 1
 			}
+     // If vehicle passes end point:
+     if (track[2].getEnd()->test()) {
+        track[2].next()->setVehicle(track[2].vehicle()); // Put vehicle to next section
+        track[2].clear(); // Clear section
+      }
 			break;
 	}
 
@@ -444,20 +460,6 @@ void loop() {
 			states[6] = 1; // Move to State 1
 			break;
 		case 1: // STATE 1 | STANDARD OPERATIONS
-			// If start button held:
-			if (expander.digitalRead(PIN_START_BUTTON) == BUTTON_PRESSED
-				&& expander.digitalRead(PIN_START_BUTTON)!= lastStateStart
-			) {
-				startHoldDown = millis();
-			}
-			if (expander.digitalRead(PIN_START_BUTTON) == BUTTON_PRESSED
-				&& millis() - startHoldDown > LONG_PRESS_DURATION
-			) {
-				track[3].disengage(); // Disengage brakes
-				states[6] = 2; // Move to State 2
-				break;
-			}
-			lastStateStart = expander.digitalRead(PIN_START_BUTTON);
 			// If start button pressed and no vehicle is in next section:
 			if (expander.digitalRead(PIN_START_BUTTON) && !track[3].next()->vehicle()) {
 				track[3].disengage(); // Disengage brakes;
@@ -486,21 +488,8 @@ void loop() {
 			break;
 	}
 
-	// TASK 7 | SERIAL WRITE
+	// TASK 7 | THEMING
 	switch (states[7]) {
-		case -1: // STATE E-STOP
-			Serial.println("{type:\"EStop\"}");
-			states[7] = 1;
-			break;
-		case 0: // STATE 0 | INIT
-			Serial.begin(BAUD_RATE);
-			break;
-		case 1: // STATE 1 | WRITE
-			break;
-	}
-
-	// TASK 8 | THEMING
-	switch (states[8]) {
 		case -1: // STATE E-STOP
 			Theming.write(0);
 			// If E-Stop is unpressed and reset is pressed:
@@ -508,13 +497,13 @@ void loop() {
 				&& expander.digitalRead(PIN_RESET_BUTTON) == BUTTON_PRESSED
 			) {
 				Theming.write(THEMING_SPEED);
-				states[8] = 1;
+				states[7] = 1;
 			}
 			break;
 		case 0: // STATE 0 | INIT
 			Theming.attach(PIN_THEMING_SERVO);
 			Theming.write(THEMING_SPEED);
-			states[8] = 1;
+			states[7] = 1;
 			lastStateTheming = expander.digitalRead(PIN_THEMING_BUTTON);
 			break;
 		case 1: // STATE 1 | RUNNING
@@ -522,7 +511,7 @@ void loop() {
 				&& lastStateTheming != expander.digitalRead(PIN_THEMING_BUTTON)
 			) {
 				Theming.write(0);
-				states[8] = 2;
+				states[7] = 2;
 			}
 			lastStateTheming = expander.digitalRead(PIN_THEMING_BUTTON);
 			break;
@@ -531,7 +520,7 @@ void loop() {
 				&& lastStateTheming != expander.digitalRead(PIN_THEMING_BUTTON)
 			) {
 				Theming.write(THEMING_SPEED);
-				states[8] = 1;
+				states[7] = 1;
 			}
 			lastStateTheming = expander.digitalRead(PIN_THEMING_BUTTON);
 			break;
@@ -546,7 +535,7 @@ void estop_interrupt() {
 }
 
 char* createString(unsigned long msg_id, byte vehicle_id, char* type, byte* data, int length) {
-	char* s = malloc(32);
+	char s[32];
 	memcpy(s, &(msg_id) + 12, 4);
 	memcpy(s + 4, &vehicle_id, 1);
 	memcpy(s + 5, type, 3);

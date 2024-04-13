@@ -3,7 +3,7 @@
 
 class TrackSection {
     """!
-    A TrackSection object represents a track block. Each block has a leading brake section, and allows only one ride vehicle to enter the block at a time.
+    A TrackSection object represents a track block. Each block has a trailing brake section, and allows only one ride vehicle to enter the block at a time.
     """
     private:
         Servo brakeRun;
@@ -16,7 +16,7 @@ class TrackSection {
         TrackSection* nextSection;
     public:
         TrackSection() {
-            id = millis(); // TODO: maybe fix
+            id = millis();
             vehicleId = 0;
             waitingId = 0;
         }
